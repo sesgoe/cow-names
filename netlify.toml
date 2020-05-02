@@ -1,0 +1,5 @@
+[build]
+
+  command = "nuxt generate"
+  publish = "dist"
+  functions = "functions"

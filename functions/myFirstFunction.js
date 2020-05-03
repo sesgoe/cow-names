@@ -1,23 +1,24 @@
-const chromium = require('chrome-aws-lambda')
+const axios = require('axios')
 
 exports.handler = async function(event, context, callback) {
-    const browser = await chromium.puppeteer.launch({
-        headless: true
+    console.info('event: ', event)
+    console.info('context: ', context)
+
+    const name = event.queryStringParameters.name
+
+    const baseUrl = `https://absbullsearch.absglobal.com/api/animal/search?Animal=${name}&ProofCode=USA&VisibilityCountryCode=USA&SearchIncludesPedigree=false`
+
+    const req = await axios.get(baseUrl, {
+        headers: {
+            Accept: 'application/json'
+        }
     })
-
-    const page = await browser.newPage()
-    await page.goto(
-        'https://absbullsearch.absglobal.com/Search/Bull?animal=Ses&proof=USA&country=USA'
-    )
-
-    const content = await page.content()
-
-    if (browser != null) {
-        await browser.close()
-    }
 
     callback(null, {
         statusCode: 200,
-        body: content
+        body: JSON.stringify(req.data),
+        headers: {
+            'Cache-Control': 'maxage=604800, public'
+        }
     })
 }

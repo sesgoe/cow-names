@@ -1,7 +1,10 @@
 const axios = require('axios')
 const AWS = require('aws-sdk')
+const dotenv = require('dotenv')
 
-const credentials = AWS.Credentials(
+dotenv.config()
+
+const credentials = new AWS.Credentials(
     process.env.MY_AWS_ACCESS_KEY_ID,
     process.env.MY_AWS_SECRET_ACCESS_KEY
 )

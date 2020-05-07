@@ -1,7 +1,12 @@
 const axios = require('axios')
 const AWS = require('aws-sdk')
 
-AWS.config.update({ region: 'us-east-2' })
+const credentials = AWS.Credentials(
+    process.env.MY_AWS_ACCESS_KEY_ID,
+    process.env.MY_AWS_SECRET_ACCESS_KEY
+)
+
+AWS.config.update({ region: 'us-east-2', credentials })
 const ddb = new AWS.DynamoDB.DocumentClient({ apiVersion: '2012-08-10' })
 
 const storeInCache = async (value) => {

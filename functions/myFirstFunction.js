@@ -50,6 +50,8 @@ function oneSuccess(promises) {
 }
 
 exports.handler = function(event, context, callback) {
+    const start = new Date().getTime()
+    console.log(`start ms: ${start}`)
     const name = event.queryStringParameters.name
 
     const baseUrl = `https://absbullsearch.absglobal.com/api/animal/search?Animal=${name}&ProofCode=USA&VisibilityCountryCode=USA&SearchIncludesPedigree=false`
@@ -65,6 +67,9 @@ exports.handler = function(event, context, callback) {
     oneSuccess([cacheHit, cacheMiss]).then(async (result) => {
         if (result.Item) {
             console.log('Cache hit for ', name)
+            const end = new Date().getTime()
+            console.log(`end ms: ${end}`)
+            console.log(`duration: ${end - start} ms`)
             return callback(null, {
                 statusCode: 200,
                 body: JSON.stringify(result)
@@ -80,6 +85,10 @@ exports.handler = function(event, context, callback) {
         console.log('Cache miss for ', name)
 
         await storeInCache(newCacheItem)
+
+        const end = new Date().getTime()
+        console.log(`end ms: ${end}`)
+        console.log(`duration: ${end - start} ms`)
 
         callback(null, {
             statusCode: 200,

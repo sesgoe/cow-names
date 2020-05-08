@@ -64,11 +64,11 @@ exports.handler = function(event, context, callback) {
 
     oneSuccess([cacheHit, cacheMiss]).then(async (result) => {
         if (result.Item) {
-            callback(null, {
+            console.log('Cache hit for ', name)
+            return callback(null, {
                 statusCode: 200,
                 body: JSON.stringify(result)
             })
-            return
         }
 
         const newCacheItem = {
@@ -76,6 +76,8 @@ exports.handler = function(event, context, callback) {
             cowNames: result.data,
             TTL: Math.floor(Date.now() / 1000 + 60 * 60 * 24 * 30)
         }
+
+        console.log('Cache miss for ', name)
 
         await storeInCache(newCacheItem)
 

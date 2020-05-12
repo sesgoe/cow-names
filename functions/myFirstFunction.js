@@ -1,3 +1,4 @@
+const Promise = require('bluebird')
 const axios = require('axios')
 const AWS = require('aws-sdk')
 
@@ -15,6 +16,8 @@ const storeInCache = async (value) => {
     return await ddb.put(params).promise()
 }
 
+// checks the cache for the existence of a particular name
+// if name does not exist in cache, the promise rejects to be able to use Promise.any on the backup web call
 const checkCache = async (name) => {
     const params = {
         TableName: 'cownames',
@@ -26,34 +29,13 @@ const checkCache = async (name) => {
     if (result.Item) {
         return result
     } else {
-        throw new Error('Cache miss')
+        throw new Error(`Cache miss for ${name}`)
     }
 }
 
-function oneSuccess(promises) {
-    return Promise.all(
-        promises.map((p) => {
-            // If a request fails, count that as a resolution so it will keep
-            // waiting for other possible successes. If a request succeeds,
-            // treat it as a rejection so Promise.all immediately bails out.
-            return p.then(
-                (val) => Promise.reject(val),
-                (err) => Promise.resolve(err)
-            )
-        })
-    ).then(
-        // If '.all' resolved, we've just got an array of errors.
-        (errors) => Promise.reject(errors),
-        // If '.all' rejected, we've got the result we wanted.
-        (val) => Promise.resolve(val)
-    )
-}
-
-exports.handler = function(event, context, callback) {
+exports.handler = async function(event, context) {
     const start = new Date().getTime()
-    console.log(`start ms: ${start}`)
     const name = event.queryStringParameters.name
-
     const baseUrl = `https://absbullsearch.absglobal.com/api/animal/search?Animal=${name}&ProofCode=USA&VisibilityCountryCode=USA&SearchIncludesPedigree=false`
 
     const cacheMiss = axios.get(baseUrl, {
@@ -64,39 +46,29 @@ exports.handler = function(event, context, callback) {
 
     const cacheHit = checkCache(name)
 
-    oneSuccess([cacheHit, cacheMiss]).then(async (result) => {
-        if (result.Item) {
-            console.log('Cache hit for ', name)
-            const end = new Date().getTime()
-            console.log(`end ms: ${end}`)
-            console.log(`duration: ${end - start} ms`)
-            return callback(null, {
-                statusCode: 200,
-                body: JSON.stringify(result)
-            })
-        }
+    const result = await Promise.any([cacheMiss, cacheHit])
 
-        const newCacheItem = {
-            name,
-            cowNames: result.data,
-            TTL: Math.floor(Date.now() / 1000 + 60 * 60 * 24 * 30)
-        }
-
-        console.log('Cache miss for ', name)
-
-        await storeInCache(newCacheItem)
-
+    // cache hit
+    if (result.Item) {
+        console.info('Cache hit for ', name)
         const end = new Date().getTime()
-        console.log(`end ms: ${end}`)
-        console.log(`duration: ${end - start} ms`)
+        console.info(`duration: ${end - start} ms`)
+        return { statusCode: 200, body: JSON.stringify(result) }
+    }
 
-        callback(null, {
-            statusCode: 200,
-            body: JSON.stringify({
-                Item: {
-                    cowNames: result.data
-                }
-            })
-        })
-    })
+    // cache miss
+    const newCacheItem = {
+        name,
+        cowNames: result.data,
+        TTL: Math.floor(Date.now() / 1000 + 60 * 60 * 24 * 30) // expires in 1 month
+    }
+
+    console.info('Cache miss for ', name)
+
+    await storeInCache(newCacheItem)
+
+    const end = new Date().getTime()
+    console.info(`duration: ${end - start} ms`)
+
+    return { statusCode: 200, body: JSON.stringify(newCacheItem) }
 }
